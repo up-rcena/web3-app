@@ -1,68 +1,55 @@
-import { MetaMaskConnector } from "wagmi/connectors/metaMask";
-import { signIn } from "next-auth/react";
-import { useAccount, useConnect, useSignMessage, useDisconnect } from "wagmi";
-import { useRouter } from "next/router";
-import axios from "axios";
-import { WalletConnectConnector } from 'wagmi/connectors/walletConnect';
+import { ConnectButton } from '@rainbow-me/rainbowkit'
+import { signIn, useSession } from 'next-auth/react'
+import { useAccount, useSignMessage, useNetwork } from 'wagmi'
+import { useEffect } from 'react'
+import { useRouter } from 'next/router'
+import axios from 'axios'
 
 function SignIn() {
-  const { connectAsync } = useConnect();
-  const { disconnectAsync } = useDisconnect();
-  const { isConnected } = useAccount();
-  const { signMessageAsync } = useSignMessage();
-  const { push } = useRouter();
+  const { isConnected, address } = useAccount()
+  const { chain } = useNetwork()
+  const { status } = useSession()
+  const { signMessageAsync } = useSignMessage()
+  const { push } = useRouter()
 
-  const handleAuth = async () => {
-    if (isConnected) {
-      await disconnectAsync();
-    }
+  useEffect(() => {
+    const handleAuth = async () => {
+      const userData = { address, chain: chain.id, network: 'evm' }
 
-    // Metamask Connector
-    // const { account, chain } = await connectAsync({
-    //   connector: new MetaMaskConnector(),
-    // });
-
-    // Wallet Connector
-    const { account, chain } = await connectAsync({
-      connector: new WalletConnectConnector({
-        options: {
-          qrcode: true,
+      const { data } = await axios.post('/api/auth/request-message', userData, {
+        headers: {
+          'content-type': 'application/json',
         },
-      }),
-    });
+      })
 
-    const userData = { address: account, chain: chain.id, network: "evm" };
+      const message = data.message
 
-    const { data } = await axios.post("/api/auth/request-message", userData, {
-      headers: {
-        "content-type": "application/json",
-      },
-    });
+      const signature = await signMessageAsync({ message })
 
-    const message = data.message;
-
-    const signature = await signMessageAsync({ message });
-    console.log("Signature", signature);
-    // redirect user after success authentication to '/user' page
-    const { url } = await signIn("credentials", {
-      message,
-      signature,
-      redirect: false,
-      callbackUrl: "/user",
-    });
-    /**
-     * instead of using signIn(..., redirect: "/user")
-     * we get the url from callback and push it to the router to avoid page refreshing
-     */
-    push(url);
-  };
+      // redirect user after success authentication to '/user' page
+      const { url } = await signIn('credentials', {
+        message,
+        signature,
+        redirect: false,
+        callbackUrl: '/user',
+      })
+      /**
+       * instead of using signIn(..., redirect: "/user")
+       * we get the url from callback and push it to the router to avoid page refreshing
+       */
+      push(url)
+    }
+    if (status === 'unauthenticated' && isConnected) {
+      handleAuth()
+    }
+  }, [status, isConnected])
 
   return (
     <div>
       <h3>Web3 Authentication</h3>
-      <button onClick={() => handleAuth()}>Authenticate via Metamask</button>
+      <ConnectButton />
     </div>
-  );
+  )
 }
 
-export default SignIn;
+export default SignIn
