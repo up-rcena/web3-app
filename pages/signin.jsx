@@ -3,6 +3,7 @@ import { signIn } from "next-auth/react";
 import { useAccount, useConnect, useSignMessage, useDisconnect } from "wagmi";
 import { useRouter } from "next/router";
 import axios from "axios";
+import { WalletConnectConnector } from 'wagmi/connectors/walletConnect';
 
 function SignIn() {
   const { connectAsync } = useConnect();
@@ -16,8 +17,18 @@ function SignIn() {
       await disconnectAsync();
     }
 
+    // Metamask Connector
+    // const { account, chain } = await connectAsync({
+    //   connector: new MetaMaskConnector(),
+    // });
+
+    // Wallet Connector
     const { account, chain } = await connectAsync({
-      connector: new MetaMaskConnector(),
+      connector: new WalletConnectConnector({
+        options: {
+          qrcode: true,
+        },
+      }),
     });
 
     const userData = { address: account, chain: chain.id, network: "evm" };
